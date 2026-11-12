@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ofertas-shopee
+    runtime: node
+    plan: free
+    buildCommand: "echo sem dependencias"
+    startCommand: node server.js
+    envVars:
+      - key: SHOPEE_APP_ID
+        sync: false
+      - key: SHOPEE_APP_SECRET
+        sync: false

@@ -1,0 +1,12 @@
+{
+  "name": "ofertas-shopee",
+  "version": "1.0.0",
+  "description": "Busca ofertas da Shopee pelo Programa de Afiliados e monta mensagens para o WhatsApp",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

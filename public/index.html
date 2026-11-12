@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ee4d2d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ofertas">
+<title>Ofertas Shopee</title>
+<style>
+  :root { --laranja:#ee4d2d; --verde:#25d366; --cinza:#6b7280; --fundo:#f5f5f5; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--fundo); color:#222; padding-bottom:80px; }
+  header { background:var(--laranja); color:#fff; padding:16px; padding-top:calc(16px + env(safe-area-inset-top)); position:sticky; top:0; z-index:5; }
+  header h1 { font-size:20px; }
+  header p { font-size:13px; opacity:.9; margin-top:2px; }
+  main { padding:12px; max-width:600px; margin:0 auto; }
+  .aviso { background:#fff7e6; border:1px solid #ffd591; color:#8a5a00; padding:10px 12px; border-radius:10px; font-size:13px; margin-bottom:12px; }
+  .erro { background:#fff1f0; border-color:#ffa39e; color:#a8071a; }
+  .barra { display:flex; gap:8px; margin-bottom:12px; }
+  .barra button { flex:1; }
+  .card { background:#fff; border-radius:14px; overflow:hidden; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .card .foto { width:100%; aspect-ratio:1/1; object-fit:cover; background:#eee; display:block; }
+  .card .sem-foto { aspect-ratio:2/1; display:flex; align-items:center; justify-content:center; font-size:48px; background:#fde8e3; }
+  .card .info { padding:12px 14px; }
+  .card h2 { font-size:15px; font-weight:600; line-height:1.3; }
+  .card .loja { font-size:12px; color:var(--cinza); margin-top:4px; }
+  .precos { display:flex; align-items:baseline; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  .antigo { color:var(--cinza); text-decoration:line-through; font-size:14px; }
+  .novo { color:var(--laranja); font-size:26px; font-weight:800; }
+  .selo { background:var(--laranja); color:#fff; font-size:12px; font-weight:700; padding:3px 8px; border-radius:20px; }
+  .extra { font-size:12px; color:var(--cinza); margin-top:6px; }
+  .acoes { display:flex; gap:8px; padding:0 14px 14px; }
+  button { font:inherit; border:none; border-radius:10px; padding:12px; font-weight:600; font-size:15px; cursor:pointer; }
+  .btn-whats { background:var(--verde); color:#fff; flex:2; }
+  .btn-sec { background:#eee; color:#333; flex:1; }
+  .btn-laranja { background:var(--laranja); color:#fff; }
+  .vazio { text-align:center; color:var(--cinza); padding:40px 20px; }
+  nav { position:fixed; bottom:0; left:0; right:0; background:#fff; display:flex; border-top:1px solid #ddd; padding-bottom:env(safe-area-inset-bottom); z-index:5; }
+  nav button { flex:1; background:none; border-radius:0; padding:14px; color:var(--cinza); font-size:14px; }
+  nav button.ativo { color:var(--laranja); }
+  .tela { display:none; }
+  .tela.ativa { display:block; }
+  .campo { background:#fff; border-radius:12px; padding:14px; margin-bottom:12px; }
+  .campo label { font-weight:600; display:block; margin-bottom:6px; }
+  .campo small { color:var(--cinza); display:block; margin-top:6px; font-size:12px; }
+  .campo input { width:100%; font:inherit; font-size:16px; padding:10px; border:1px solid #ccc; border-radius:8px; }
+  .campo input[type=range] { padding:0; border:none; }
+  .valor { color:var(--laranja); font-weight:700; }
+  .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:#222; color:#fff; padding:10px 16px; border-radius:20px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:10; }
+  .toast.mostrar { opacity:1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛍️ Ofertas Shopee</h1>
+  <p id="subtitulo">Toque em "Enviar no WhatsApp" e escolha o grupo</p>
+</header>
+
+<main>
+  <!-- TELA DE OFERTAS -->
+  <section id="tela-ofertas" class="tela ativa">
+    <div id="aviso"></div>
+    <div class="barra">
+      <button class="btn-laranja" onclick="carregarOfertas()">🔄 Buscar ofertas</button>
+      <button class="btn-sec" onclick="mostrarDescartadas()">↩️ Desfazer descartes</button>
+    </div>
+    <div id="lista"><p class="vazio">Carregando ofertas...</p></div>
+  </section>
+
+  <!-- TELA DE CONFIGURAÇÕES -->
+  <section id="tela-config" class="tela">
+    <div class="campo">
+      <label>Desconto mínimo: <span class="valor" id="desconto-valor">30%</span></label>
+      <input type="range" id="cfg-desconto" min="0" max="90" step="5" value="30"
+             oninput="document.getElementById('desconto-valor').textContent = this.value + '%'">
+      <small>Só aparecem ofertas com pelo menos esse desconto.</small>
+    </div>
+    <div class="campo">
+      <label>Palavras-chave</label>
+      <input type="text" id="cfg-palavras" placeholder="ex: fone, air fryer, maquiagem">
+      <small>Separe por vírgula. Deixe vazio para ver as mais vendidas em geral.</small>
+    </div>
+    <div class="campo">
+      <label>Ofertas por busca</label>
+      <input type="number" id="cfg-limite" min="5" max="50" value="20">
+      <small>Quantos produtos buscar para cada palavra-chave (máx. 50).</small>
+    </div>
+    <div class="campo">
+      <label>Texto extra no fim da mensagem</label>
+      <input type="text" id="cfg-rodape" placeholder="ex: Corre que acaba! 🏃‍♀️">
+      <small>Opcional. Aparece em todas as mensagens.</small>
+    </div>
+    <button class="btn-laranja" style="width:100%" onclick="salvarConfig()">💾 Salvar e buscar</button>
+  </section>
+</main>
+
+<nav>
+  <button id="aba-ofertas" class="ativo" onclick="trocarTela('ofertas')">🏷️ Ofertas</button>
+  <button id="aba-config" onclick="trocarTela('config')">⚙️ Configurações</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- Guardar preferências no celular ----------
+const PADRAO = { desconto: 30, palavras: "", limite: 20, rodape: "" };
+
+function ler(chave, padrao) {
+  try { const v = localStorage.getItem(chave); return v ? JSON.parse(v) : padrao; }
+  catch (e) { return padrao; }
+}
+function gravar(chave, valor) {
+  try { localStorage.setItem(chave, JSON.stringify(valor)); } catch (e) {}
+}
+
+let config = Object.assign({}, PADRAO, ler("config", {}));
+let descartadas = ler("descartadas", []);
+let ofertasAtuais = [];
+
+// ---------- Navegação ----------
+function trocarTela(nome) {
+  document.querySelectorAll(".tela").forEach(t => t.classList.remove("ativa"));
+  document.querySelectorAll("nav button").forEach(b => b.classList.remove("ativo"));
+  document.getElementById("tela-" + nome).classList.add("ativa");
+  document.getElementById("aba-" + nome).classList.add("ativo");
+  window.scrollTo(0, 0);
+}
+
+function toast(texto) {
+  const t = document.getElementById("toast");
+  t.textContent = texto;
+  t.classList.add("mostrar");
+  setTimeout(() => t.classList.remove("mostrar"), 2000);
+}
+
+// ---------- Configurações ----------
+function preencherConfig() {
+  document.getElementById("cfg-desconto").value = config.desconto;
+  document.getElementById("desconto-valor").textContent = config.desconto + "%";
+  document.getElementById("cfg-palavras").value = config.palavras;
+  document.getElementById("cfg-limite").value = config.limite;
+  document.getElementById("cfg-rodape").value = config.rodape;
+}
+
+function salvarConfig() {
+  config = {
+    desconto: Number(document.getElementById("cfg-desconto").value),
+    palavras: document.getElementById("cfg-palavras").value.trim(),
+    limite: Math.min(Math.max(Number(document.getElementById("cfg-limite").value) || 20, 5), 50),
+    rodape: document.getElementById("cfg-rodape").value.trim(),
+  };
+  gravar("config", config);
+  toast("Configurações salvas ✅");
+  trocarTela("ofertas");
+  carregarOfertas();
+}
+
+// ---------- Buscar ofertas no servidor ----------
+async function buscar(palavra) {
+  const params = new URLSearchParams({ descontoMinimo: config.desconto, limite: config.limite, palavra });
+  const r = await fetch("/api/ofertas?" + params);
+  const dados = await r.json();
+  if (!r.ok) throw new Error(dados.erro || "Erro ao buscar ofertas");
+  return dados;
+}
+
+async function carregarOfertas() {
+  const lista = document.getElementById("lista");
+  const aviso = document.getElementById("aviso");
+  lista.innerHTML = '<p class="vazio">Buscando ofertas... ⏳</p>';
+  aviso.innerHTML = "";
+
+  const palavras = config.palavras ? config.palavras.split(",").map(p => p.trim()).filter(Boolean) : [""];
+
+  try {
+    const resultados = await Promise.all(palavras.map(buscar));
+    if (resultados.some(r => r.modoDemo)) {
+      aviso.innerHTML = '<div class="aviso">⚠️ Modo demonstração: as chaves da Shopee ainda não foram configuradas no servidor. Estas ofertas são de exemplo.</div>';
+    }
+    // Junta tudo sem repetir produto e ordena pelo maior desconto
+    const mapa = new Map();
+    resultados.forEach(r => r.ofertas.forEach(o => mapa.set(o.id, o)));
+    ofertasAtuais = [...mapa.values()].sort((a, b) => b.desconto - a.desconto);
+    desenhar();
+  } catch (e) {
+    lista.innerHTML = "";
+    aviso.innerHTML = '<div class="aviso erro">❌ ' + escapar(e.message) + "</div>";
+  }
+}
+
+// ---------- Mostrar os cartões ----------
+function reais(v) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+function escapar(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
+function mensagemFinal(o) {
+  return config.rodape ? o.mensagem + "\n\n" + config.rodape : o.mensagem;
+}
+
+function desenhar() {
+  const lista = document.getElementById("lista");
+  const visiveis = ofertasAtuais.filter(o => !descartadas.includes(o.id));
+  document.getElementById("subtitulo").textContent =
+    visiveis.length + " oferta" + (visiveis.length === 1 ? "" : "s") + " • toque em Enviar e escolha o grupo";
+
+  if (!visiveis.length) {
+    lista.innerHTML = '<p class="vazio">Nenhuma oferta encontrada com esses filtros.<br>Tente diminuir o desconto mínimo nas Configurações.</p>';
+    return;
+  }
+
+  lista.innerHTML = visiveis.map(o => `
+    <article class="card">
+      ${o.imagem ? `<img class="foto" src="${escapar(o.imagem)}" alt="" loading="lazy">` : `<div class="sem-foto">🛍️</div>`}
+      <div class="info">
+        <h2>${escapar(o.nome)}</h2>
+        <div class="loja">${escapar(o.loja || "")}</div>
+        <div class="precos">
+          ${o.precoAntigo > o.precoNovo ? `<span class="antigo">${reais(o.precoAntigo)}</span>` : ""}
+          <span class="novo">${reais(o.precoNovo)}</span>
+          ${o.desconto ? `<span class="selo">-${o.desconto}%</span>` : ""}
+        </div>
+        <div class="extra">⭐ ${o.nota || "-"} • ${o.vendidos} vendidos • comissão ${o.comissao}%</div>
+      </div>
+      <div class="acoes">
+        <button class="btn-whats" onclick="enviarWhats('${o.id}')">📲 Enviar no WhatsApp</button>
+        <button class="btn-sec" onclick="copiar('${o.id}')">📋</button>
+        <button class="btn-sec" onclick="descartar('${o.id}')">✖️</button>
+      </div>
+    </article>`).join("");
+}
+
+// ---------- Ações ----------
+function acharOferta(id) { return ofertasAtuais.find(o => o.id === id); }
+
+function enviarWhats(id) {
+  const o = acharOferta(id);
+  if (!o) return;
+  // Abre o WhatsApp com o texto pronto; ela escolhe o grupo e toca em enviar
+  window.location.href = "https://wa.me/?text=" + encodeURIComponent(mensagemFinal(o));
+}
+
+async function copiar(id) {
+  const o = acharOferta(id);
+  if (!o) return;
+  try { await navigator.clipboard.writeText(mensagemFinal(o)); toast("Mensagem copiada 📋"); }
+  catch (e) { toast("Não deu para copiar"); }
+}
+
+function descartar(id) {
+  descartadas.push(id);
+  gravar("descartadas", descartadas.slice(-500));
+  desenhar();
+  toast("Oferta escondida");
+}
+
+function mostrarDescartadas() {
+  descartadas = [];
+  gravar("descartadas", []);
+  desenhar();
+  toast("Ofertas escondidas voltaram");
+}
+
+// ---------- Início ----------
+preencherConfig();
+carregarOfertas();
+</script>
+</body>
+</html>
