@@ -48,6 +48,21 @@
   .campo input { width:100%; font:inherit; font-size:16px; padding:10px; border:1px solid #ccc; border-radius:8px; }
   .campo input[type=range] { padding:0; border:none; }
   .valor { color:var(--laranja); font-weight:700; }
+  .card { position:relative; }
+  .card.selecionada { outline:3px solid var(--laranja); }
+  .marcar { position:absolute; top:10px; left:10px; width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,.95); border:2px solid #ccc; font-size:18px; display:flex; align-items:center; justify-content:center; padding:0; z-index:2; }
+  .card.selecionada .marcar { background:var(--laranja); border-color:var(--laranja); color:#fff; }
+  .barra-selecao { position:fixed; left:0; right:0; bottom:calc(52px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid #ddd; padding:10px 12px; display:none; gap:8px; z-index:6; box-shadow:0 -2px 8px rgba(0,0,0,.08); }
+  .barra-selecao.mostrar { display:flex; }
+  body.com-selecao { padding-bottom:150px; }
+  .fundo-modal { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:flex-end; z-index:20; }
+  .fundo-modal.mostrar { display:flex; }
+  .modal { background:#fff; width:100%; border-radius:16px 16px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); max-height:80vh; overflow:auto; }
+  .modal h3 { font-size:17px; margin-bottom:6px; }
+  .modal p { font-size:13px; color:var(--cinza); margin-bottom:12px; }
+  .modal .parte { display:flex; gap:8px; margin-bottom:8px; }
+  .modal .parte .btn-whats { flex:3; }
+  .modal .parte .feito { opacity:.5; }
   .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:#222; color:#fff; padding:10px 16px; border-radius:20px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:10; }
   .toast.mostrar { opacity:1; }
 </style>
@@ -64,8 +79,9 @@
   <section id="tela-ofertas" class="tela ativa">
     <div id="aviso"></div>
     <div class="barra">
-      <button class="btn-laranja" onclick="carregarOfertas()">🔄 Buscar ofertas</button>
-      <button class="btn-sec" onclick="mostrarDescartadas()">↩️ Desfazer descartes</button>
+      <button class="btn-laranja" onclick="carregarOfertas()">🔄 Buscar</button>
+      <button class="btn-sec" onclick="selecionarTodas()" id="btn-todas">☑️ Selecionar todas</button>
+      <button class="btn-sec" onclick="mostrarDescartadas()">↩️ Desfazer</button>
     </div>
     <div id="lista"><p class="vazio">Carregando ofertas...</p></div>
   </section>
@@ -101,6 +117,21 @@
   <button id="aba-ofertas" class="ativo" onclick="trocarTela('ofertas')">🏷️ Ofertas</button>
   <button id="aba-config" onclick="trocarTela('config')">⚙️ Configurações</button>
 </nav>
+
+<div class="barra-selecao" id="barra-selecao">
+  <button class="btn-whats" onclick="enviarSelecionadas()" id="btn-enviar-sel">📲 Enviar selecionadas</button>
+  <button class="btn-sec" onclick="copiarSelecionadas()">📋</button>
+  <button class="btn-sec" onclick="limparSelecao()">✖️</button>
+</div>
+
+<div class="fundo-modal" id="modal" onclick="if (event.target === this) fecharModal()">
+  <div class="modal">
+    <h3 id="modal-titulo">Enviando</h3>
+    <p>Toque em enviar, escolha o grupo no WhatsApp e volte para o app para mandar a próxima.</p>
+    <div id="partes"></div>
+    <button class="btn-sec" style="width:100%;margin-top:8px" onclick="fecharModal()">Fechar</button>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -211,7 +242,8 @@ function desenhar() {
   }
 
   lista.innerHTML = visiveis.map(o => `
-    <article class="card">
+    <article class="card ${selecionadas.has(o.id) ? "selecionada" : ""}">
+      <button class="marcar" onclick="alternarSelecao('${o.id}')" aria-label="Selecionar">${selecionadas.has(o.id) ? "✓" : ""}</button>
       ${o.imagem ? `<img class="foto" src="${escapar(o.imagem)}" alt="" loading="lazy">` : `<div class="sem-foto">🛍️</div>`}
       <div class="info">
         <h2>${escapar(o.nome)}</h2>
@@ -229,7 +261,113 @@ function desenhar() {
         <button class="btn-sec" onclick="descartar('${o.id}')">✖️</button>
       </div>
     </article>`).join("");
+  atualizarBarraSelecao();
 }
+
+// ---------- Seleção de várias ofertas ----------
+let selecionadas = new Set();
+let partesEnviadas = new Set();
+
+function visiveisAgora() { return ofertasAtuais.filter(o => !descartadas.includes(o.id)); }
+
+function alternarSelecao(id) {
+  selecionadas.has(id) ? selecionadas.delete(id) : selecionadas.add(id);
+  desenhar();
+}
+
+function selecionarTodas() {
+  const vis = visiveisAgora();
+  const todasMarcadas = vis.length && vis.every(o => selecionadas.has(o.id));
+  if (todasMarcadas) selecionadas.clear();
+  else vis.forEach(o => selecionadas.add(o.id));
+  desenhar();
+}
+
+function limparSelecao() { selecionadas.clear(); desenhar(); }
+
+function atualizarBarraSelecao() {
+  // Remove da seleção o que não está mais na tela
+  const ids = new Set(visiveisAgora().map(o => o.id));
+  selecionadas.forEach(id => { if (!ids.has(id)) selecionadas.delete(id); });
+
+  const n = selecionadas.size;
+  document.getElementById("barra-selecao").classList.toggle("mostrar", n > 0);
+  document.body.classList.toggle("com-selecao", n > 0);
+  document.getElementById("btn-enviar-sel").textContent = `📲 Enviar ${n} oferta${n === 1 ? "" : "s"}`;
+  const vis = visiveisAgora();
+  document.getElementById("btn-todas").textContent =
+    vis.length && vis.every(o => selecionadas.has(o.id)) ? "◻️ Desmarcar todas" : "☑️ Selecionar todas";
+}
+
+// ---------- Fila: uma mensagem por oferta ----------
+let fila = []; // ofertas na ordem de envio
+
+function abrirWhats(texto) {
+  window.location.href = "https://wa.me/?text=" + encodeURIComponent(texto);
+}
+
+function enviarSelecionadas() {
+  fila = visiveisAgora().filter(o => selecionadas.has(o.id));
+  if (!fila.length) return;
+  if (fila.length === 1) return abrirWhats(mensagemFinal(fila[0]));
+  partesEnviadas = new Set();
+  salvarFila();
+  desenharFila();
+  document.getElementById("modal").classList.add("mostrar");
+}
+
+function proximaIndex() { return fila.findIndex((_, i) => !partesEnviadas.has(i)); }
+
+function desenharFila() {
+  const prox = proximaIndex();
+  const feitas = partesEnviadas.size;
+  document.getElementById("modal-titulo").textContent =
+    prox === -1 ? "✅ Todas enviadas!" : `Enviando ${feitas} de ${fila.length}`;
+
+  const grande = prox === -1
+    ? `<button class="btn-laranja" style="width:100%;margin-bottom:14px" onclick="terminarFila()">Concluir</button>`
+    : `<button class="btn-whats" style="width:100%;padding:16px;font-size:17px;margin-bottom:14px" onclick="enviarItem(${prox})">
+         📲 Enviar ${feitas === 0 ? "primeira" : "próxima"} (${prox + 1} de ${fila.length})
+       </button>`;
+
+  document.getElementById("partes").innerHTML = grande + fila.map((o, i) => `
+    <div class="parte">
+      <button class="btn-sec ${partesEnviadas.has(i) ? "feito" : ""}" style="flex:3;text-align:left;font-weight:500;font-size:14px" onclick="enviarItem(${i})">
+        ${partesEnviadas.has(i) ? "✅" : (i + 1) + "."} ${escapar(o.nome.slice(0, 40))}
+      </button>
+      <button class="btn-sec" onclick="copiarTexto(mensagemFinal(fila[${i}]), 'Copiada 📋')">📋</button>
+    </div>`).join("");
+}
+
+function salvarFila() {
+  gravar("fila", { ofertas: fila, enviadas: [...partesEnviadas] });
+}
+
+function enviarItem(i) {
+  partesEnviadas.add(i);
+  salvarFila();
+  desenharFila();
+  abrirWhats(mensagemFinal(fila[i]));
+}
+
+function terminarFila() {
+  gravar("fila", null);
+  fila = [];
+  fecharModal();
+  limparSelecao();
+  toast("Pronto! Todas enviadas 🎉");
+}
+
+async function copiarTexto(texto, aviso) {
+  try { await navigator.clipboard.writeText(texto); toast(aviso); }
+  catch (e) { toast("Não deu para copiar"); }
+}
+
+function copiarSelecionadas() {
+  const textos = visiveisAgora().filter(o => selecionadas.has(o.id)).map(mensagemFinal);
+  copiarTexto(textos.join("\n\n━━━━━━━━━━\n\n"), "Todas copiadas 📋");
+}
+function fecharModal() { document.getElementById("modal").classList.remove("mostrar"); }
 
 // ---------- Ações ----------
 function acharOferta(id) { return ofertasAtuais.find(o => o.id === id); }
@@ -262,7 +400,18 @@ function mostrarDescartadas() {
   toast("Ofertas escondidas voltaram");
 }
 
+// Se a página recarregou no meio de uma fila, continua de onde parou
+function retomarFila() {
+  const salva = ler("fila", null);
+  if (!salva || !salva.ofertas || !salva.ofertas.length) return;
+  fila = salva.ofertas;
+  partesEnviadas = new Set(salva.enviadas || []);
+  desenharFila(); // se já enviou todas, mostra "Todas enviadas" com botão Concluir
+  document.getElementById("modal").classList.add("mostrar");
+}
+
 // ---------- Início ----------
+retomarFila();
 preencherConfig();
 carregarOfertas();
 </script>
